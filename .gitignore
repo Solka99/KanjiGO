@@ -1,0 +1,19 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Node.js
+node_modules/
+
+# VS Code / PyCharm / systemowe
+.vscode/
+.idea/
+.DS_Store
+
+# Build
+dist/
+build/
+
+

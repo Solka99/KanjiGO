@@ -1,0 +1,66 @@
+KanjiGo – Database Setup Instructions
+These are the steps to set up the local PostgreSQL database and create all required tables for the KanjiGo backend.
+
+✅ Prerequisites
+Python 3.10+
+
+PostgreSQL installed and running
+
+VS Code (optional) with the PostgreSQL extension (or any DB client)
+
+Project cloned locally
+
+📦 1. Install dependencies
+Create a virtual environment and install the packages:
+
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+
+
+⚙️ 2. Configure environment variables
+In the backend_python/ folder, create a .env file if it doesn't exist:
+
+db_user=postgres
+db_password=your_password
+db_host=localhost
+db_port=5432
+db_database=kanji_db
+
+kanji_alive_api_key=your_api_key
+kanji_alive_api_host=kanjialive-api.p.rapidapi.com
+
+💡 Replace your_password and your_api_key with your actual credentials.
+
+🛠 3. Create the PostgreSQL database
+If you haven’t created the database yet:
+
+Option A: Using PostgreSQL Extension (VS Code)
+Click the 🐘 PostgreSQL icon in the left sidebar
+
+Connect to localhost:5432 with user postgres
+
+Right-click the server → New Query
+
+Run:
+
+CREATE DATABASE kanji_db;
+
+
+🏗 4. Create tables from models
+From the project root directory, run:
+
+python -m backend_python.db.create_tables
+
+✅ You should see:
+
+Creating tables...
+Done.
+This will create the tables: users, kanji_master, dictionary_entry in the kanji_db database.
+
+🧪 5. Verify the database
+You can check the tables in your DB client (pgAdmin, DBeaver, VS Code extension) by running:
+
+SELECT * FROM users;
+
+✅ Done!
