@@ -26,12 +26,13 @@ export default function SelectionScreen({ route, navigation }: Props) {
   };
 
   useEffect(() => {
+    // ... fetchData 関数の内容は変更なし ...
     const fetchData = async () => {
       setIsLoading(true);
       setKanjiList(filterKanji(recognizedCharacters));
 
       if (originalText.trim() === '') {
-          setTranslation(''); // 空の場合はAPIを呼ばずに終了
+          setTranslation('');
           setIsLoading(false);
           return;
       }
@@ -55,6 +56,11 @@ export default function SelectionScreen({ route, navigation }: Props) {
     fetchData();
   }, [originalText]);
 
+  // ★★★ 漢字ボタンが押された時の処理を追加 ★★★
+  const handleKanjiPress = (kanji: string) => {
+    navigation.navigate('KanjiDetail', { kanji: kanji });
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <TouchableOpacity style={styles.closeButton} onPress={() => navigation.goBack()}>
@@ -74,7 +80,8 @@ export default function SelectionScreen({ route, navigation }: Props) {
           <View style={styles.kanjiContainer}>
             {kanjiList.length > 0 ? (
               kanjiList.map((kanji, index) => (
-                <TouchableOpacity key={index} style={styles.kanjiButton}>
+                // ★★★ onPressイベントを追加 ★★★
+                <TouchableOpacity key={index} style={styles.kanjiButton} onPress={() => handleKanjiPress(kanji)}>
                   <Text style={styles.kanjiText}>{kanji}</Text>
                 </TouchableOpacity>
               ))
@@ -87,7 +94,7 @@ export default function SelectionScreen({ route, navigation }: Props) {
     </SafeAreaView>
   );
 }
-
+// ... スタイル定義は変更なし ...
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#212121', alignItems: 'center', justifyContent: 'center' },
   closeButton: { position: 'absolute', top: 50, right: 20, zIndex: 1 },
