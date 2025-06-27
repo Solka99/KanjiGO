@@ -2,7 +2,15 @@ from fastapi import APIRouter, Depends, Request, HTTPException, status
 from backend_python.db.models import *
 from backend_python.db.database import get_db
 
+from pydantic import BaseModel
+
 router = APIRouter()
+
+class KanjiDataForEntry(BaseModel):
+    character: str
+    reading: str
+    meaning: str
+    user_id: int
 
 @router.post("/users")
 async def create_user(request: Request, db = Depends(get_db)):
@@ -256,3 +264,50 @@ def delete_entry(dict_id: int, db = Depends(get_db)):
     db.delete(e)
     db.commit()
     return
+
+
+#
+# ─── ADD KANJI TO USER'S DICTIONARY ──────────────────────────────────
+#
+
+@router.post("/dictionary/add", status_code=status.HTTP_201_CREATED)
+def add_kanji_to_dictionary(data: KanjiDataForEntry, db = Depends(get_db)):
+    # 1. kanji_masterテーブルに漢字が存在するか確認
+    kanji_master_entry = db.query(KanjiMaster).filter(KanjiMaster.character == data.character).first()
+
+    # 2. もし存在しなければ、kanji_masterに新規登録
+    if not kanji_master_entry:
+        new_kanji = KanjiMaster(
+            character=data.character,
+            reading=data.reading,
+            meaning=data.meaning
+            # 他のフィールドは後で更新可能
+        )
+        db.add(new_kanji)
+        db.flush() # これにより、commit前でもnew_kanji.kanji_idが確定する
+        kanji_id_to_use = new_kanji.kanji_id
+    else:
+        kanji_id_to_use = kanji_master_entry.kanji_id
+
+    # 3. ユーザーの辞書に既に登録済みか確認
+    existing_entry = db.query(DictionaryEntry).filter(
+        DictionaryEntry.user_id == data.user_id,
+        DictionaryEntry.kanji_id == kanji_id_to_use
+    ).first()
+
+    if existing_entry:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This Kanji is already in the user's dictionary"
+        )
+
+    # 4. dictionary_entryテーブルに紐付けを登録
+    new_dictionary_entry = DictionaryEntry(
+        kanji_id=kanji_id_to_use,
+        user_id=data.user_id
+    )
+    db.add(new_dictionary_entry)
+    db.commit()
+    db.refresh(new_dictionary_entry)
+
+    return {"message": "Kanji added to dictionary successfully", "entry_id": new_dictionary_entry.dict_id}

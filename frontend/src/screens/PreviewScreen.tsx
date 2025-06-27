@@ -66,14 +66,14 @@ export default function PreviewScreen({ route, navigation }: Props) {
 
           {!recognizedText ? (
             <TouchableOpacity style={styles.recognizeButton} onPress={handleRecognize} disabled={isLoading}>
-              <Text style={styles.recognizeButtonText}>この文字を認識する</Text>
+              <Text style={styles.recognizeButtonText}>Recognize This Text</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity 
               style={styles.nextButton} 
               onPress={() => navigation.navigate('Selection', { recognizedCharacters: recognizedText })}
             >
-              <Text style={styles.recognizeButtonText}>次へ</Text>
+              <Text style={styles.recognizeButtonText}>Next</Text>
             </TouchableOpacity>
           )}
         </View>

@@ -5,6 +5,7 @@ from backend_python.api.crud import router as crud_router
 from backend_python.quiz_generator import router as quiz_generator_router
 from backend_python.api.translate import router as translation_router
 from backend_python.api.tatoeba import router as tatoeba_router
+from backend_python.api.kanjialive import router as kanjialive_router
 from backend_python.config.settings import settings
 
 
@@ -15,6 +16,7 @@ app.include_router(quiz_generator_router)
 app.include_router(crud_router)
 app.include_router(translation_router)
 app.include_router(tatoeba_router)
+app.include_router(kanjialive_router) 
 
 @app.get("/")
 async def root():
