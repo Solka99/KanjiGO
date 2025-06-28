@@ -2,7 +2,7 @@ import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView } from 'react-na
 import { StatusBar } from 'expo-status-bar';
 import { FontAwesome } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App'; // App.tsxから型をインポート
+import { RootStackParamList } from '../../App';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -44,7 +44,10 @@ export default function HomeScreen({ navigation }: Props) {
             <Text style={styles.buttonText}>Kanji Photo</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.button}>
+          <TouchableOpacity 
+            style={styles.button}
+            onPress={() => navigation.navigate('Quiz', { kanjiList: ['水', '火', '人'] })}
+          >
             <FontAwesome name="pencil" size={24} color="#333" />
             <Text style={styles.buttonText}>Quiz</Text>
           </TouchableOpacity>
@@ -59,7 +62,6 @@ export default function HomeScreen({ navigation }: Props) {
   );
 }
 
-// スタイル定義 (完全版)
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f0f2f5' },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, backgroundColor: 'white' },
