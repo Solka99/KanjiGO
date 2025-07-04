@@ -5,7 +5,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { API_CONFIG } from '../apiConfig';
 
-// APIから受け取るクイズの型
 interface QuizQuestion {
   type: string;
   question: string;
@@ -16,7 +15,7 @@ interface QuizQuestion {
 type Props = NativeStackScreenProps<RootStackParamList, 'Quiz'>;
 
 export default function QuizScreen({ route, navigation }: Props) {
-  const { kanjiList } = route.params;
+  const { kanjiList, returnTo } = route.params;
   
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -28,20 +27,19 @@ export default function QuizScreen({ route, navigation }: Props) {
 
   const quizTypes = ['meaning', 'reading', 'reading_to_kanji'];
 
-  // 最初に全クイズデータを取得する
   useEffect(() => {
     const fetchAllQuestions = async () => {
       try {
-        const questionPromises = kanjiList.map(kanji => {
+        const fetchedQuestions: QuizQuestion[] = [];
+        for (const kanji of kanjiList) {
           const randomType = quizTypes[Math.floor(Math.random() * quizTypes.length)];
-          return fetch(`${API_CONFIG.quiz}/${randomType}/${encodeURIComponent(kanji)}`).then(res => {
-            if (!res.ok) {
-              throw new Error(`Failed to fetch quiz for ${kanji}`);
-            }
-            return res.json();
-          });
-        });
-        const fetchedQuestions = await Promise.all(questionPromises);
+          const response = await fetch(`${API_CONFIG.quiz}/${randomType}/${encodeURIComponent(kanji)}`);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch quiz for ${kanji}`);
+          }
+          const question = await response.json();
+          fetchedQuestions.push(question);
+        }
         setQuestions(fetchedQuestions);
       } catch (error) {
         console.error("Failed to fetch quiz questions:", error);
@@ -57,7 +55,7 @@ export default function QuizScreen({ route, navigation }: Props) {
   const totalQuestions = kanjiList.length;
 
   const handleAnswerPress = (option: string) => {
-    if (isAnswered) return; // 一度回答したら変更不可
+    if (isAnswered) return;
     
     setIsAnswered(true);
     setSelectedAnswer(option);
@@ -69,19 +67,17 @@ export default function QuizScreen({ route, navigation }: Props) {
   const handleNextPress = () => {
     if (currentQuestionIndex < totalQuestions - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
-      // 次の問題のために状態をリセット
       setIsAnswered(false);
       setSelectedAnswer(null);
     } else {
-      // 全ての問題が終了したら、結果画面へスコア情報を渡して遷移
       navigation.navigate('QuizResult', { 
         score: score, 
-        totalQuestions: totalQuestions 
+        totalQuestions: totalQuestions,
+        returnTo: returnTo
       });
     }
   };
 
-  // 選択肢ボタンのスタイルを動的に決める
   const getOptionStyle = (option: string) => {
     if (!isAnswered) return styles.optionButton;
     if (option === currentQuestion.answer) return [styles.optionButton, styles.correctOption];
@@ -106,7 +102,6 @@ export default function QuizScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <FontAwesome name="times" size={24} color="#757575" />
@@ -114,12 +109,10 @@ export default function QuizScreen({ route, navigation }: Props) {
         <Text style={styles.progressText}>{currentQuestionIndex + 1} / {totalQuestions}</Text>
       </View>
       
-      {/* Question Area */}
       <View style={styles.questionContainer}>
         <Text style={styles.questionText}>{currentQuestion.question}</Text>
       </View>
 
-      {/* Options Area */}
       <View style={styles.optionsContainer}>
         {currentQuestion.options.map((option, index) => (
           <TouchableOpacity 
@@ -133,7 +126,6 @@ export default function QuizScreen({ route, navigation }: Props) {
         ))}
       </View>
 
-      {/* Next Button */}
       {isAnswered && (
         <View style={styles.footer}>
             <TouchableOpacity style={styles.nextButton} onPress={handleNextPress}>

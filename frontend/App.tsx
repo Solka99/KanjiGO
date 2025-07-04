@@ -11,6 +11,8 @@ import SelectionScreen from './src/screens/SelectionScreen';
 import KanjiDetailScreen from './src/screens/KanjiDetailScreen';
 import QuizScreen from './src/screens/QuizScreen';
 import QuizResultScreen from './src/screens/QuizResultScreen';
+import MyKanjisScreen from './src/screens/MyKanjisScreen';
+import MyKanjiDetailScreen from './src/screens/MyKanjiDetailScreen';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -18,8 +20,17 @@ export type RootStackParamList = {
   Preview: { photoUri: string };
   Selection: { recognizedCharacters: string[] };
   KanjiDetail: { kanji: string };
-  Quiz: { kanjiList: string[] };
-  QuizResult: { score: number; totalQuestions: number; };
+  Quiz: { 
+    kanjiList: string[]; 
+    returnTo?: keyof RootStackParamList; // 戻り先画面名をオプションとして追加
+  };
+  QuizResult: { 
+    score: number; 
+    totalQuestions: number;
+    returnTo?: keyof RootStackParamList; // 戻り先画面名をオプションとして追加
+  };
+  MyKanjis: undefined;
+  MyKanjiDetail: { kanji: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -36,6 +47,8 @@ export default function App() {
           <Stack.Screen name="KanjiDetail" component={KanjiDetailScreen} options={{ presentation: 'modal', headerShown: false }}/>
           <Stack.Screen name="Quiz" component={QuizScreen} options={{ presentation: 'modal', headerShown: false }}/>
           <Stack.Screen name="QuizResult" component={QuizResultScreen} options={{ presentation: 'modal', headerShown: false }}/>
+          <Stack.Screen name="MyKanjis" component={MyKanjisScreen} options={{ presentation: 'modal', headerShown: false }}/>
+          <Stack.Screen name="MyKanjiDetail" component={MyKanjiDetailScreen} options={{ presentation: 'modal', headerShown: false }}/>
         </Stack.Navigator>
       </NavigationContainer>
       <Toast />

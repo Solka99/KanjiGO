@@ -9,15 +9,20 @@ type Props = NativeStackScreenProps<RootStackParamList, 'QuizResult'>;
 const POINTS_PER_CORRECT_ANSWER = 50;
 
 export default function QuizResultScreen({ route, navigation }: Props) {
-  // 前の画面からスコアと問題数を受け取る
-  const { score, totalQuestions } = route.params;
+  const { score, totalQuestions, returnTo } = route.params;
   
-  // ポイントを計算する
   const pointsEarned = score * POINTS_PER_CORRECT_ANSWER;
 
   const handleFinish = () => {
-    // スタックの最初の画面（Home）に戻る
-    navigation.popToTop();
+    if (returnTo) {
+      // 戻り先が指定されている場合 (Practiceからの呼び出し)
+      // クイズ結果画面とクイズ画面の2つを閉じて、指定された画面に戻る
+      navigation.pop(2); 
+    } else {
+      // 戻り先が指定されていない場合 (HomeScreenからの呼び出し)
+      // スタックの最初の画面（Home）に戻る
+      navigation.popToTop();
+    }
   };
 
   return (
