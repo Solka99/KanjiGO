@@ -1,313 +1,80 @@
 from fastapi import APIRouter, Depends, Request, HTTPException, status
-from backend_python.db.models import *
-from backend_python.db.database import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
-from pydantic import BaseModel
+# 必要なモデルと、新しい非同期セッション関数をインポート
+from backend_python.db.models import User, DictionaryEntry
+from backend_python.db.database import get_async_session
 
 router = APIRouter()
 
-class KanjiDataForEntry(BaseModel):
-    character: str
-    reading: str
-    meaning: str
-    user_id: int
+# このファイル内のすべての関数を非同期(async def)に変更し、
+# データベースセッションも非同期用のもの(get_async_session)に修正します。
 
 @router.post("/users")
-async def create_user(request: Request, db = Depends(get_db)):
-    data = await request.json()                       # raw JSON dict
-    user = User(email=data.get("email"),
-                password=data.get("password"))
-    db.add(user)                                       # stage INSERT
-    db.commit()                                        # execute it
-    db.refresh(user)                                   # load generated PK
-    print(user.email, user.password, user.created_at)
-    return {
-        "user_id":      user.user_id,
-        "email":        user.email,
-        "password":     user.password,
-        "created_at":   user.created_at
-    } 
+async def create_user(request: Request, db: AsyncSession = Depends(get_async_session)):
+    data = await request.json()
+    # Userモデルの hashed_password を使用
+    user = User(email=data.get("email"), hashed_password=data.get("password"))
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user
 
 @router.get("/users/")
-def read_users(db = Depends(get_db)):
-    users = db.query(User).all()
-    return [
-        {"user_id": u.user_id, "email": u.email, "password": u.password, "created_at": u.created_at}
-        for u in users
-    ]
+async def read_users(db: AsyncSession = Depends(get_async_session)):
+    result = await db.execute(select(User))
+    users = result.scalars().all()
+    return users
 
 @router.get("/users/{user_id}")
-def read_user(user_id: int, db = Depends(get_db)):
-    user = db.query(User).get(user_id)
+async def read_user(user_id: int, db: AsyncSession = Depends(get_async_session)):
+    user = await db.get(User, user_id)
     if not user:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
-    return {
-        "user_id":    user.user_id,
-        "email":      user.email,
-        "password":     user.password,
-        "created_at": user.created_at,
-    }
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return user
 
 @router.put("/users/{user_id}")
-async def update_user(user_id: int, request: Request, db = Depends(get_db)):
-    user = db.query(User).get(user_id)
+async def update_user(user_id: int, request: Request, db: AsyncSession = Depends(get_async_session)):
+    user = await db.get(User, user_id)
     if not user:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     data = await request.json()
-    if "email"    in data: user.email    = data["email"]
-    if "password" in data: user.password = data["password"]
-    db.commit()
-    return {
-        "user_id":    user.user_id,
-        "email":      user.email,
-        "password":     user.password,
-        "created_at": user.created_at,
-    }
+    if "email" in data:
+        user.email = data["email"]
+    if "password" in data:
+        user.hashed_password = data["password"]
+    await db.commit()
+    return user
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(user_id: int, db = Depends(get_db)):
-    user = db.query(User).get(user_id)
+async def delete_user(user_id: int, db: AsyncSession = Depends(get_async_session)):
+    user = await db.get(User, user_id)
     if not user:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
-    db.delete(user)
-    db.commit()
-    # returns 204 No Content
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    await db.delete(user)
+    await db.commit()
     return
 
 #
-# ─── KANJI_MASTER CRUD ────────────────────────────────────────────────────────
-#
-
-@router.post("/kanji_master", status_code=status.HTTP_201_CREATED)
-async def create_kanji(request: Request, db = Depends(get_db)):
-    data = await request.json()
-    km = KanjiMaster(
-        character        = data["character"],
-        meaning          = data["meaning"],
-        reading          = data.get("reading"),
-        radical          = data.get("radical"),
-        stroke_count     = data.get("stroke_count"),
-        example_sentences= data.get("example_sentences"),
-    )
-    db.add(km)
-    db.commit()
-    db.refresh(km)
-    return {
-        "kanji_id":         km.kanji_id,
-        "character":        km.character,
-        "meaning":          km.meaning,
-        "reading":          km.reading,
-        "radical":          km.radical,
-        "stroke_count":     km.stroke_count,
-        "example_sentences":km.example_sentences,
-    }
-
-@router.get("/kanji_master")
-def read_kanji_all(db = Depends(get_db)):
-    return [
-        {
-            "kanji_id":         k.kanji_id,
-            "character":        k.character,
-            "meaning":          k.meaning,
-            "reading":          k.reading,
-            "radical":          k.radical,
-            "stroke_count":     k.stroke_count,
-            "example_sentences":k.example_sentences,
-        }
-        for k in db.query(KanjiMaster).all()
-    ]
-
-@router.get("/kanji_master/{kanji_id}")
-def read_kanji(kanji_id: int, db = Depends(get_db)):
-    k = db.query(KanjiMaster).get(kanji_id)
-    if not k:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Kanji not found")
-    return {
-        "kanji_id":         k.kanji_id,
-        "character":        k.character,
-        "meaning":          k.meaning,
-        "reading":          k.reading,
-        "radical":          k.radical,
-        "stroke_count":     k.stroke_count,
-        "example_sentences":k.example_sentences,
-    }
-
-@router.put("/kanji_master/{kanji_id}")
-async def update_kanji(kanji_id: int, request: Request, db = Depends(get_db)):
-    k = db.query(KanjiMaster).get(kanji_id)
-    if not k:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Kanji not found")
-    data = await request.json()
-    for field in ("character","meaning","reading","radical","stroke_count","example_sentences"):
-        if field in data:
-            setattr(k, field, data[field])
-    db.commit()
-    return {
-        "kanji_id":         k.kanji_id,
-        "character":        k.character,
-        "meaning":          k.meaning,
-        "reading":          k.reading,
-        "radical":          k.radical,
-        "stroke_count":     k.stroke_count,
-        "example_sentences":k.example_sentences,
-    }
-
-@router.delete("/kanji_master/{kanji_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_kanji(kanji_id: int, db = Depends(get_db)):
-    k = db.query(KanjiMaster).get(kanji_id)
-    if not k:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Kanji not found")
-    db.delete(k)
-    db.commit()
-    return
-
-#
-# ─── DICTIONARY_ENTRY CRUD ─────────────────────────────────────────────────────
+# ─── DICTIONARY_ENTRY CRUD (非同期版) ───────────────────────────────────
 #
 
 @router.post("/dictionary_entries", status_code=status.HTTP_201_CREATED)
-async def create_entry(request: Request, db = Depends(get_db)):
+async def create_entry(request: Request, db: AsyncSession = Depends(get_async_session)):
     data = await request.json()
     de = DictionaryEntry(
-        kanji_id = data["kanji_id"],
-        user_id  = data["user_id"],
-        note     = data.get("note"),
-        photo_pass = data.get("photo_pass"),
+        kanji_character=data["kanji_character"],
+        user_id=data["user_id"],
+        photo_pass=data.get("photo_pass"),
     )
     db.add(de)
-    db.commit()
-    db.refresh(de)
-    return {
-        "dict_id":    de.dict_id,
-        "kanji_id":   de.kanji_id,
-        "user_id":    de.user_id,
-        "note":       de.note,
-        "photo_pass": de.photo_pass,
-        "added_at":   de.added_at,
-    }
+    await db.commit()
+    await db.refresh(de)
+    return de
 
 @router.get("/dictionary_entries")
-def read_entries(db = Depends(get_db)):
-    return [
-        {
-            "dict_id":    e.dict_id,
-            "kanji_id":   e.kanji_id,
-            "user_id":    e.user_id,
-            "note":       e.note,
-            "photo_pass": e.photo_pass,
-            "added_at":   e.added_at,
-        }
-        for e in db.query(DictionaryEntry).all()
-    ]
-
-@router.get("/dictionary_entries/{user_id}")
-def read_entry(dict_id: int, db = Depends(get_db)):
-    e = db.query(DictionaryEntry).get(dict_id)
-    if not e:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Entry not found")
-    return {
-        "dict_id":    e.dict_id,
-        "kanji_id":   e.kanji_id,
-        "user_id":    e.user_id,
-        "note":       e.note,
-        "photo_pass": e.photo_pass,
-        "added_at":   e.added_at,
-    }
-
-@router.put("/dictionary_entries/{dict_id}")
-async def update_entry(dict_id: int, request: Request, db = Depends(get_db)):
-    e = db.query(DictionaryEntry).get(dict_id)
-    if not e:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Entry not found")
-    data = await request.json()
-    for field in ("kanji_id","user_id","note","photo_pass"):
-        if field in data:
-            setattr(e, field, data[field])
-    db.commit()
-    return {
-        "dict_id":    e.dict_id,
-        "kanji_id":   e.kanji_id,
-        "user_id":    e.user_id,
-        "note":       e.note,
-        "photo_pass": e.photo_pass,
-        "added_at":   e.added_at,
-    }
-
-@router.get("/dictionary_entries/user/{user_id}")
-def read_entries_for_user(user_id: int, db = Depends(get_db)):
-    entries = (
-        db.query(DictionaryEntry)
-          .filter(DictionaryEntry.user_id == user_id)
-          .all()
-    )
-    if not entries:
-        # you can return an empty list instead if you prefer
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No entries for this user")
-    return [
-        {
-            "dict_id":    e.dict_id,
-            "kanji_id":   e.kanji_id,
-            "user_id":    e.user_id,
-            "note":       e.note,
-            "photo_pass": e.photo_pass,
-            "added_at":   e.added_at,
-        }
-        for e in entries
-    ]
-
-
-@router.delete("/dictionary_entries/{dict_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_entry(dict_id: int, db = Depends(get_db)):
-    e = db.query(DictionaryEntry).get(dict_id)
-    if not e:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Entry not found")
-    db.delete(e)
-    db.commit()
-    return
-
-
-#
-# ─── ADD KANJI TO USER'S DICTIONARY ──────────────────────────────────
-#
-
-@router.post("/dictionary/add", status_code=status.HTTP_201_CREATED)
-def add_kanji_to_dictionary(data: KanjiDataForEntry, db = Depends(get_db)):
-    # 1. kanji_masterテーブルに漢字が存在するか確認
-    kanji_master_entry = db.query(KanjiMaster).filter(KanjiMaster.character == data.character).first()
-
-    # 2. もし存在しなければ、kanji_masterに新規登録
-    if not kanji_master_entry:
-        new_kanji = KanjiMaster(
-            character=data.character,
-            reading=data.reading,
-            meaning=data.meaning
-            # 他のフィールドは後で更新可能
-        )
-        db.add(new_kanji)
-        db.flush() # これにより、commit前でもnew_kanji.kanji_idが確定する
-        kanji_id_to_use = new_kanji.kanji_id
-    else:
-        kanji_id_to_use = kanji_master_entry.kanji_id
-
-    # 3. ユーザーの辞書に既に登録済みか確認
-    existing_entry = db.query(DictionaryEntry).filter(
-        DictionaryEntry.user_id == data.user_id,
-        DictionaryEntry.kanji_id == kanji_id_to_use
-    ).first()
-
-    if existing_entry:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="This Kanji is already in the user's dictionary"
-        )
-
-    # 4. dictionary_entryテーブルに紐付けを登録
-    new_dictionary_entry = DictionaryEntry(
-        kanji_id=kanji_id_to_use,
-        user_id=data.user_id
-    )
-    db.add(new_dictionary_entry)
-    db.commit()
-    db.refresh(new_dictionary_entry)
-
-    return {"message": "Kanji added to dictionary successfully", "entry_id": new_dictionary_entry.dict_id}
+async def read_entries(db: AsyncSession = Depends(get_async_session)):
+    result = await db.execute(select(DictionaryEntry))
+    entries = result.scalars().all()
+    return entries

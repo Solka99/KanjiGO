@@ -1,62 +1,134 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, SafeAreaView, Alert } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { RootStackParamList } from '../../App';
 import { API_CONFIG } from '../apiConfig';
 
+// --- Type definitions ---
 interface QuizQuestion {
   type: string;
   question: string;
   options: string[];
   answer: string;
 }
+interface SavedKanji {
+  character: string;
+  kanji_id: number;
+  meaning: string;
+}
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Quiz'>;
 
+// 配列をシャッフルするためのヘルパー関数
+const shuffleArray = (array: any[]) => {
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+};
+
 export default function QuizScreen({ route, navigation }: Props) {
+  // 前の画面から、練習したい漢字のリスト(kanjiList)と戻り先(returnTo)を受け取る
   const { kanjiList, returnTo } = route.params;
   
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [score, setScore] = useState(0);
-
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const quizTypes = ['meaning', 'reading', 'reading_to_kanji'];
 
-  useEffect(() => {
-    const fetchAllQuestions = async () => {
-      try {
-        const fetchedQuestions: QuizQuestion[] = [];
-        for (const kanji of kanjiList) {
-          const randomType = quizTypes[Math.floor(Math.random() * quizTypes.length)];
-          const response = await fetch(`${API_CONFIG.quiz}/${randomType}/${encodeURIComponent(kanji)}`);
-          if (!response.ok) {
-            throw new Error(`Failed to fetch quiz for ${kanji}`);
-          }
-          const question = await response.json();
-          fetchedQuestions.push(question);
-        }
-        setQuestions(fetchedQuestions);
-      } catch (error) {
-        console.error("Failed to fetch quiz questions:", error);
-        Alert.alert("Error", "Could not load the quiz. Please try again later.", [{ text: "OK", onPress: () => navigation.goBack() }]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchAllQuestions();
-  }, [kanjiList]);
+  useFocusEffect(
+    useCallback(() => {
+      const initializeQuiz = async () => {
+        setIsLoading(true);
+        try {
+          const token = await AsyncStorage.getItem('access_token');
+          if (!token) throw new Error("Please log in first.");
 
+          let selectedKanji: string[];
+
+          // ★★★ ここからが変更点：動作を切り替えるロジック ★★★
+          if (kanjiList && kanjiList.length > 0) {
+            // --- Practiceモード ---
+            // MyKanjiDetailScreenから渡された漢字リストを使用する
+            selectedKanji = kanjiList;
+          } else {
+            // --- 通常のQuizモード ---
+            // 1. ログインユーザーの情報を取得
+            const userRes = await fetch(API_CONFIG.getCurrentUser, { headers: { Authorization: `Bearer ${token}` } });
+            if (!userRes.ok) throw new Error("Could not verify user.");
+            const user = await userRes.json();
+
+            // 2. ユーザーが保存した全漢字を取得
+            const userKanjiRes = await fetch(API_CONFIG.getUserKanji(user.id), {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            if (!userKanjiRes.ok) throw new Error("Failed to fetch saved kanji");
+            const allSavedKanji: SavedKanji[] = await userKanjiRes.json();
+            
+            // 3. 4つ以上ないとクイズが作れないためチェック
+            if (allSavedKanji.length < 4) {
+              Alert.alert("Not Enough Kanji", "You need at least 4 kanji in your dictionary to take a quiz.", [{ text: "OK", onPress: () => navigation.goBack() }]);
+              return;
+            }
+
+            // 4. 全漢字の中からランダムに3つ選ぶ
+            const shuffled = shuffleArray(allSavedKanji);
+            selectedKanji = shuffled.slice(0, 3).map(k => k.character);
+          }
+
+          // --- 共通のクイズ生成ロジック ---
+          const questionPromises = selectedKanji.map((kanji, index) => {
+            // Practiceモードの場合は、可能な限り違うタイプの問題にする
+            const shuffledTypes = shuffleArray(quizTypes);
+            const type = shuffledTypes[index % shuffledTypes.length];
+
+            return fetch(API_CONFIG.quiz(type, kanji), {
+              headers: { Authorization: `Bearer ${token}` }
+            }).then(res => {
+                if (!res.ok) throw new Error(`Quiz fetch failed for ${kanji}`);
+                return res.json();
+            });
+          });
+          
+          const fetchedQuestions = await Promise.all(questionPromises);
+          setQuestions(fetchedQuestions);
+          // ★★★ ここまでが変更点 ★★★
+
+        } catch (error) {
+          console.error("Failed to initialize quiz:", error);
+          Alert.alert("Error", (error as Error).message, [{ text: "OK", onPress: () => navigation.goBack() }]);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      initializeQuiz();
+
+      // クリーンアップ関数
+      return () => {
+        setQuestions([]);
+        setCurrentQuestionIndex(0);
+        setScore(0);
+        setIsLoading(true);
+      };
+    }, [kanjiList]) // kanjiListの変更を検知して再実行
+  );
+  
   const currentQuestion = useMemo(() => questions[currentQuestionIndex], [questions, currentQuestionIndex]);
-  const totalQuestions = kanjiList.length;
+  const totalQuestions = questions.length;
 
   const handleAnswerPress = (option: string) => {
     if (isAnswered) return;
-    
     setIsAnswered(true);
     setSelectedAnswer(option);
     if (option === currentQuestion.answer) {
@@ -92,10 +164,7 @@ export default function QuizScreen({ route, navigation }: Props) {
   if (!currentQuestion) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text style={styles.questionText}>Could not load question. Please try again.</Text>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.nextButton}>
-            <Text style={styles.nextButtonText}>Go Back</Text>
-        </TouchableOpacity>
+        <Text style={styles.questionText}>Loading questions...</Text>
       </SafeAreaView>
     );
   }

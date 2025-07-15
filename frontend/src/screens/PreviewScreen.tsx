@@ -71,7 +71,10 @@ export default function PreviewScreen({ route, navigation }: Props) {
           ) : (
             <TouchableOpacity 
               style={styles.nextButton} 
-              onPress={() => navigation.navigate('Selection', { recognizedCharacters: recognizedText })}
+              onPress={() => navigation.navigate('Selection', { 
+                recognizedCharacters: recognizedText, 
+                photoUri: photoUri 
+              })}
             >
               <Text style={styles.recognizeButtonText}>Next</Text>
             </TouchableOpacity>

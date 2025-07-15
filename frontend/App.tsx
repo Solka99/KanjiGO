@@ -5,6 +5,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Toast from 'react-native-toast-message';
 
 import HomeScreen from './src/screens/HomeScreen';
+import LoginScreen from './src/screens/LoginScreen';
+import RegisterScreen from './src/screens/RegisterScreen'; // ← 新しい画面をインポート
 import CameraScreen from './src/screens/CameraScreen';
 import PreviewScreen from './src/screens/PreviewScreen';
 import SelectionScreen from './src/screens/SelectionScreen';
@@ -16,19 +18,14 @@ import MyKanjiDetailScreen from './src/screens/MyKanjiDetailScreen';
 
 export type RootStackParamList = {
   Home: undefined;
+  Login: undefined;
+  Register: undefined; // ← 新しい画面の型定義を追加
   Camera: undefined;
   Preview: { photoUri: string };
-  Selection: { recognizedCharacters: string[] };
-  KanjiDetail: { kanji: string };
-  Quiz: { 
-    kanjiList: string[]; 
-    returnTo?: keyof RootStackParamList; // 戻り先画面名をオプションとして追加
-  };
-  QuizResult: { 
-    score: number; 
-    totalQuestions: number;
-    returnTo?: keyof RootStackParamList; // 戻り先画面名をオプションとして追加
-  };
+  Selection: { recognizedCharacters: string[], photoUri: string };
+  KanjiDetail: { kanji: string, photoUri: string };
+  Quiz: { kanjiList?: string[], returnTo?: keyof RootStackParamList };
+  QuizResult: { score: number; totalQuestions: number; returnTo?: keyof RootStackParamList; };
   MyKanjis: undefined;
   MyKanjiDetail: { kanji: string };
 };
@@ -39,7 +36,9 @@ export default function App() {
   return (
     <View style={{ flex: 1 }}>
       <NavigationContainer>
-        <Stack.Navigator>
+        <Stack.Navigator initialRouteName="Login">
+          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }}/>
           <Stack.Screen name="Camera" component={CameraScreen} options={{ headerShown: false }}/>
           <Stack.Screen name="Preview" component={PreviewScreen} options={{ headerShown: false }} />

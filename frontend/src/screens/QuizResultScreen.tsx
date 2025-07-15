@@ -1,26 +1,56 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../../App';
+import { API_CONFIG } from '../apiConfig';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'QuizResult'>;
 
 const POINTS_PER_CORRECT_ANSWER = 50;
 
 export default function QuizResultScreen({ route, navigation }: Props) {
+  // 前の画面からスコア、問題数、戻り先情報を受け取る
   const { score, totalQuestions, returnTo } = route.params;
   
+  // ポイントを計算する
   const pointsEarned = score * POINTS_PER_CORRECT_ANSWER;
+
+  // ポイントをDBに保存する処理
+  useEffect(() => {
+    const savePoints = async () => {
+      if (pointsEarned <= 0) return; // 0点なら何もしない
+      try {
+        const token = await AsyncStorage.getItem('access_token');
+        if (!token) throw new Error("Could not find access token.");
+
+        const userRes = await fetch(API_CONFIG.getCurrentUser, { 
+            headers: { Authorization: `Bearer ${token}` } 
+        });
+        if (!userRes.ok) throw new Error("Could not verify user.");
+        const user = await userRes.json();
+
+        await fetch(API_CONFIG.addPoints(user.id), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ points: pointsEarned })
+        });
+      } catch (error) {
+        console.error("Failed to save points:", error);
+        // ここでのエラーはユーザー体験を損なわないよう、あえて通知しない
+      }
+    };
+    savePoints();
+  }, [pointsEarned]); // pointsEarnedが計算されたら一度だけ実行
 
   const handleFinish = () => {
     if (returnTo) {
-      // 戻り先が指定されている場合 (Practiceからの呼び出し)
-      // クイズ結果画面とクイズ画面の2つを閉じて、指定された画面に戻る
       navigation.pop(2); 
     } else {
-      // 戻り先が指定されていない場合 (HomeScreenからの呼び出し)
-      // スタックの最初の画面（Home）に戻る
       navigation.popToTop();
     }
   };

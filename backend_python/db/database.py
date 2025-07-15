@@ -1,26 +1,18 @@
 from sqlalchemy import create_engine
 from backend_python.config.settings import settings
 from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from typing import AsyncGenerator
 
 DATABASE_URL = (
-    f"postgresql://{settings.db_user}:{settings.db_password}"
+    f"postgresql+asyncpg://{settings.db_user}:{settings.db_password}"
     f"@{settings.db_host}:{settings.db_port}/{settings.db_database}"
 )
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
+engine = create_async_engine(DATABASE_URL, echo=True)
+async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 Base = declarative_base()
 
-# stmt = text("SELECT x, y FROM some_table WHERE y > :y ORDER BY x, y")
-# with Session(engine) as session:
-#     result = session.execute(stmt, {"y": 6})
-#     for row in result:
-#          print(f"x: {row.x}  y: {row.y}")
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+    async with async_session_maker() as session:
+        yield session

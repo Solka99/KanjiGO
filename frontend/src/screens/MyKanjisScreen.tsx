@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, SafeAreaView, Alert, FlatList, Dimensions } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { RootStackParamList } from '../../App';
 import { API_CONFIG } from '../apiConfig';
 
@@ -13,8 +16,6 @@ interface SavedKanji {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MyKanjis'>;
 
-const USER_ID_FOR_TEST = 1;
-
 const NUM_COLUMNS = 3;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const ITEM_MARGIN = 10;
@@ -25,25 +26,39 @@ export default function MyKanjisScreen({ navigation }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [savedKanjis, setSavedKanjis] = useState<SavedKanji[]>([]);
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', async () => {
-      setIsLoading(true);
-      try {
-        const response = await fetch(`${API_CONFIG.my_kanjis}/${USER_ID_FOR_TEST}`);
-        if (!response.ok) throw new Error('Failed to fetch saved kanji');
-        const data = await response.json();
-        setSavedKanjis(data);
-      } catch (error) {
-        console.error(error);
-        Alert.alert("Error", "Could not load your saved kanji.");
-      } finally {
-        setIsLoading(false);
-      }
-    });
-    return unsubscribe;
-  }, [navigation]);
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchSavedKanjis = async () => {
+        setIsLoading(true);
+        try {
+          const token = await AsyncStorage.getItem('access_token');
+          if (!token) throw new Error("Please log in first.");
+          
+          const userRes = await fetch(API_CONFIG.getCurrentUser, { headers: { Authorization: `Bearer ${token}` } });
+          if (!userRes.ok) throw new Error("Could not verify user.");
+          const user = await userRes.json();
 
-  // ★★★ ここが変更点：遷移先を 'MyKanjiDetail' に変更 ★★★
+          // ★★★ ここが変更点：Authorizationヘッダーを追加 ★★★
+          const response = await fetch(API_CONFIG.getUserKanji(user.id), {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+
+          if (!response.ok) throw new Error('Failed to fetch saved kanji');
+          
+          const data = await response.json();
+          setSavedKanjis(data);
+        } catch (error) {
+          console.error(error);
+          Alert.alert("Error", (error as Error).message);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      fetchSavedKanjis();
+    }, [])
+  );
+
   const renderGridItem = ({ item }: { item: SavedKanji }) => (
     <TouchableOpacity 
       style={styles.gridItem}
@@ -55,7 +70,6 @@ export default function MyKanjisScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Kanjis</Text>
         <TouchableOpacity style={styles.closeButton} onPress={() => navigation.goBack()}>
@@ -63,7 +77,6 @@ export default function MyKanjisScreen({ navigation }: Props) {
         </TouchableOpacity>
       </View>
 
-      {/* Content */}
       {isLoading ? (
         <ActivityIndicator size="large" color="#fff" style={{ marginTop: 50 }} />
       ) : (

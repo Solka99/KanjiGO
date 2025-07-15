@@ -1,29 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  ActivityIndicator, 
-  SafeAreaView, 
-  Alert, 
-  ScrollView 
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, SafeAreaView, Alert, ScrollView } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { SvgUri } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// These files are assumed to be correctly located in your project
 import { RootStackParamList } from '../../App';
 import { API_CONFIG } from '../apiConfig';
 
-// --- Type definition matching the successful API response ---
+// --- Type definitions ---
 interface Word {
   word: string;
   reading: string;
   meaning: string;
 }
-
 interface KanjiAliveData {
   kanji: string;
   meaning: string;
@@ -37,23 +27,27 @@ interface KanjiAliveData {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'KanjiDetail'>;
 
-// --- Reusable Section Title Component ---
 const SectionTitle = ({ title }: { title: string }) => (
   <Text style={styles.sectionTitle}>{title}</Text>
 );
 
 export default function KanjiDetailScreen({ route, navigation }: Props) {
-  const { kanji } = route.params;
+  const { kanji, photoUri } = route.params;
   const [isLoading, setIsLoading] = useState(true);
   const [kanjiData, setKanjiData] = useState<KanjiAliveData | null>(null);
 
-  // --- Data fetching logic ---
   useEffect(() => {
     const fetchKanjiData = async () => {
       setIsLoading(true);
       try {
+        const token = await AsyncStorage.getItem('access_token');
+        if (!token) throw new Error("Please log in first.");
+
         const encodedKanji = encodeURIComponent(kanji);
-        const response = await fetch(`${API_CONFIG.kanjialive}/${encodedKanji}`);
+        
+        const response = await fetch(API_CONFIG.kanjialive(encodedKanji), {
+          headers: { Authorization: `Bearer ${token}` }
+        });
         
         if (!response.ok) {
           const errorData = await response.json();
@@ -70,20 +64,46 @@ export default function KanjiDetailScreen({ route, navigation }: Props) {
         setIsLoading(false);
       }
     };
-
     fetchKanjiData();
   }, [kanji]);
 
-  // --- Helper function to generate stroke image URLs ---
-  const generateStrokeImageUris = () => {
-    if (!kanjiData || !kanjiData.stroke_order?.image || !kanjiData.strokes) {
-      return [];
+  const addKanjiToDatabase = async () => {
+    try {
+      const token = await AsyncStorage.getItem('access_token');
+      if (!token) throw new Error("Please log in first.");
+      
+      const userRes = await fetch(API_CONFIG.getCurrentUser, { headers: { Authorization: `Bearer ${token}` } });
+      if (!userRes.ok) throw new Error("Could not verify user.");
+      const user = await userRes.json();
+
+      const formData = new FormData();
+      formData.append("kanji_character", kanji);
+      formData.append("user_id", user.id.toString());
+      formData.append("photo", { uri: photoUri, name: "kanji.jpg", type: "image/jpeg" } as any);
+
+      const response = await fetch(API_CONFIG.addKanji, {
+        method: "POST",
+        body: formData,
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (response.ok) {
+        Alert.alert("Success", "Kanji added to your dictionary!");
+      } else {
+        const error = await response.json();
+        Alert.alert("Error", error.detail || "Something went wrong.");
+      }
+    } catch (error) {
+      Alert.alert("Request Error", (error as Error).message);
     }
+  };
+  
+  const generateStrokeImageUris = () => {
+    if (!kanjiData || !kanjiData.stroke_order?.image || !kanjiData.strokes) return [];
     const baseUrl = kanjiData.stroke_order.image.replace(/_\d+\.svg$/, '');
     return Array.from({ length: kanjiData.strokes }, (_, i) => `${baseUrl}_${i + 1}.svg`);
   };
 
-  // --- Loading State UI ---
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -92,7 +112,6 @@ export default function KanjiDetailScreen({ route, navigation }: Props) {
     );
   }
 
-  // --- Data Fetching Failed UI ---
   if (!kanjiData) {
     return (
       <SafeAreaView style={styles.container}>
@@ -105,10 +124,9 @@ export default function KanjiDetailScreen({ route, navigation }: Props) {
       </SafeAreaView>
     );
   }
-
+  
   const strokeImageUris = generateStrokeImageUris();
 
-  // --- Main Content UI ---
   return (
     <SafeAreaView style={styles.container}>
       <TouchableOpacity style={styles.closeButton} onPress={() => navigation.goBack()}>
@@ -116,7 +134,7 @@ export default function KanjiDetailScreen({ route, navigation }: Props) {
       </TouchableOpacity>
       
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Header Section (Kanji, Meaning, Readings) */}
+        {/* Header Section */}
         <View style={styles.header}>
           <View>
             <Text style={styles.meaningText}>{kanjiData.meaning}</Text>
@@ -159,9 +177,8 @@ export default function KanjiDetailScreen({ route, navigation }: Props) {
         )}
       </ScrollView>
 
-      {/* Add Kanji Button (fixed at the bottom) */}
       <View style={styles.addButtonContainer}>
-        <TouchableOpacity style={styles.addButton}>
+        <TouchableOpacity style={styles.addButton} onPress={addKanjiToDatabase}>
           <Text style={styles.addButtonText}>+ Add Kanji</Text>
         </TouchableOpacity>
       </View>
@@ -169,7 +186,6 @@ export default function KanjiDetailScreen({ route, navigation }: Props) {
   );
 }
 
-// --- Stylesheet ---
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#121212' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },

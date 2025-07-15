@@ -1,37 +1,48 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from backend_python.db.models import KanjiMaster, DictionaryEntry
-from backend_python.db.database import get_db
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from typing import List
+
+from backend_python.db.models import DictionaryEntry, User 
+from backend_python.db.database import get_async_session 
+# ★★★ ここが変更点1: 認証の本体である fastapi_users をインポート ★★★
+from backend_python.db.auth.auth import fastapi_users
 
 router = APIRouter()
 
-@router.get("/my-kanjis/{user_id}")
-def get_user_saved_kanjis(user_id: int, db: Session = Depends(get_db)):
+# ★★★ ここが変更点2: 依存関係を fastapi_users.current_user() に変更 ★★★
+@router.get("/my-kanjis/{user_id}", status_code=200)
+async def get_user_saved_kanjis(
+    user_id: int, 
+    db: AsyncSession = Depends(get_async_session), 
+    current_user: User = Depends(fastapi_users.current_user(active=True))
+):
     """
-    指定されたユーザーIDが保存した漢字のリストを返すエンドポイント。
-    dictionary_entryテーブルとkanji_masterテーブルをJOINして必要な情報を取得する。
+    指定されたユーザーIDが保存した漢字のリストを返す。
+    fastapi-usersの認証済みユーザーにのみ許可する。
     """
-    saved_kanjis = (
-        db.query(
-            KanjiMaster.kanji_id,
-            KanjiMaster.character,
-            KanjiMaster.meaning
-        )
-        .join(DictionaryEntry, KanjiMaster.kanji_id == DictionaryEntry.kanji_id)
+    # セキュリティチェック: ログイン中のユーザーが自身のデータを要求しているか確認
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this resource")
+
+    query = (
+        select(DictionaryEntry.kanji_character)
         .filter(DictionaryEntry.user_id == user_id)
-        .order_by(DictionaryEntry.added_at.desc())
-        .all()
+        .distinct()
     )
+    
+    result = await db.execute(query)
+    saved_kanjis = result.scalars().all()
 
     if not saved_kanjis:
-        # エラーではなく空のリストを返す方がフロントエンドで扱いやすい
         return []
 
+    # フロントエンドが期待する形式に変換
     return [
         {
-            "kanji_id": kanji.kanji_id,
-            "character": kanji.character,
-            "meaning": kanji.meaning.split(',')[0] # 意味が長い場合があるので、最初のものだけ取得
+            "kanji_id": index, 
+            "character": kanji,
+            "meaning": "" 
         }
-        for kanji in saved_kanjis
+        for index, kanji in enumerate(saved_kanjis)
     ]

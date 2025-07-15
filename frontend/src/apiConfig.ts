@@ -1,11 +1,20 @@
-const NGROK_BASE_URL = 'https://f168-202-18-108-24.ngrok-free.app'; 
+// ngrokを再起動したら、この行のURLだけを書き換えます。
+const BASE_URL = 'https://99d055323a7f.ngrok-free.app'; 
 
 export const API_CONFIG = {
-  ocr: `${NGROK_BASE_URL}/uploadfile`,
-  translate: `${NGROK_BASE_URL}/translate`,
-  jisho: `${NGROK_BASE_URL}/jisho`,
-  add_to_dictionary: `${NGROK_BASE_URL}/dictionary/add`, 
-  kanjialive: `${NGROK_BASE_URL}/kanjialive`,
-  quiz: `${NGROK_BASE_URL}/quiz`,
-  my_kanjis: `${NGROK_BASE_URL}/my-kanjis`,
+  // Static endpoints
+  ocr: `${BASE_URL}/uploadfile`,
+  addKanji: `${BASE_URL}/dictionary_entries/add_kanji`,
+  login: `${BASE_URL}/auth/jwt/login`,
+  logout: `${BASE_URL}/auth/jwt/logout`,
+  getCurrentUser: `${BASE_URL}/auth/users/me`,
+  getRanking: `${BASE_URL}/ranking`,
+  register: `${BASE_URL}/auth/register`, // ← この行を追加
+
+  // Dynamic endpoints requiring parameters (as functions)
+  translate: (text: string) => `${BASE_URL}/translate/${text}`,
+  kanjialive: (kanji_char: string) => `${BASE_URL}/kanjialive/${kanji_char}`,
+  quiz: (quiz_type: string, kanji_char: string) => `${BASE_URL}/quiz/${quiz_type}/${kanji_char}`,
+  getUserKanji: (user_id: number) => `${BASE_URL}/my-kanjis/${user_id}`,
+  addPoints: (user_id: number) => `${BASE_URL}/users/${user_id}/add-points`,
 };

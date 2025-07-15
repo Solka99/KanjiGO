@@ -1,45 +1,38 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, func
-from sqlalchemy.orm import relationship, declarative_base
-from backend_python.db.database import SessionLocal, Base
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, func, Boolean
+from sqlalchemy.orm import relationship
+from .database import Base
+from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTable
 
-class User(Base):
-    __tablename__ = 'users'
+# --- 1. 正しく統合された User クラス ---
+class User(SQLAlchemyBaseUserTable[int], Base):
+    __tablename__ = "users"
 
-    user_id = Column(Integer, primary_key=True,  autoincrement=True)
-    email = Column(String(255), unique=True, nullable=False)
-    password = Column(String(255), nullable=False)
+    # fastapi-usersは 'id' を主キーとして期待するため、'id' に統一します。
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    is_superuser = Column(Boolean, default=False, nullable=False)
+    is_verified = Column(Boolean, default=False, nullable=False)
+    points = Column(Integer, default=0, nullable=False) # pointsカラムもここに含めます
     created_at = Column(DateTime, server_default=func.now())
-
+    
     dictionary_entries = relationship("DictionaryEntry", back_populates="user")
 
+# --- 2. KanjiMaster は不要なのでコメントアウトのまま ---
+# class KanjiMaster(Base):
+#     ...
 
-class KanjiMaster(Base):
-    __tablename__ = 'kanji_master'
-
-    kanji_id = Column(Integer, primary_key=True, autoincrement=True)
-    character = Column(String(1), unique=True, nullable=False)
-    meaning = Column(Text, nullable=False)
-    reading = Column(String(100), nullable=True)
-    radical = Column(String(10), nullable=True)
-    stroke_count = Column(Integer, nullable=True)
-    example_sentences = Column(Text, nullable=True)
-
-    dictionary_entries = relationship("DictionaryEntry", back_populates="kanji")
-
-
+# --- 3. DictionaryEntry クラス ---
 class DictionaryEntry(Base):
     __tablename__ = 'dictionary_entry'
 
     dict_id = Column(Integer, primary_key=True, autoincrement=True)
-    kanji_id = Column(Integer, ForeignKey("kanji_master.kanji_id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
-    note = Column(Text, nullable=True)
+    kanji_character = Column(String(10), nullable=True)
+    # ★★★ ここが変更点: ForeignKeyを 'users.id' に修正 ★★★
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     photo_pass = Column(String(255), nullable=True)
     added_at = Column(DateTime, server_default=func.now())
 
-    kanji = relationship("KanjiMaster", back_populates="dictionary_entries")
     user = relationship("User", back_populates="dictionary_entries")
-
-
-session = SessionLocal()
 
