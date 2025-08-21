@@ -3,8 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 # 必要なモデルと、新しい非同期セッション関数をインポート
-from backend_python.db.models import User, DictionaryEntry
-from backend_python.db.database import get_async_session
+from db.models import User, DictionaryEntry
+from db.database import get_async_session
 
 router = APIRouter()
 

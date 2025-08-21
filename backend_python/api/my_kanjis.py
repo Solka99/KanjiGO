@@ -3,10 +3,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
 
-from backend_python.db.models import DictionaryEntry, User 
-from backend_python.db.database import get_async_session 
+from db.models import DictionaryEntry, User 
+from db.database import get_async_session 
 # ★★★ ここが変更点1: 認証の本体である fastapi_users をインポート ★★★
-from backend_python.db.auth.auth import fastapi_users
+from db.auth.auth import fastapi_users
 
 router = APIRouter()
 

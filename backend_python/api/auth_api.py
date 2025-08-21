@@ -1,7 +1,7 @@
 from fastapi import APIRouter
-from ..db.auth.auth import fastapi_users, auth_backend
+from db.auth.auth import fastapi_users, auth_backend
 from fastapi_users.router import ErrorCode
-from ..db.schemas import UserRead, UserCreate, UserUpdate
+from db.schemas import UserRead, UserCreate, UserUpdate
 
 router = APIRouter(
     prefix="/auth"

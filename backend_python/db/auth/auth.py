@@ -1,7 +1,7 @@
 from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
 from fastapi_users import FastAPIUsers
-from ...db.auth.user_manager import get_user_manager
-from ...db.models import User
+from db.auth.user_manager import get_user_manager
+from db.models import User
 
 SECRET = "AAA123"
 

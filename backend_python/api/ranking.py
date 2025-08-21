@@ -4,9 +4,9 @@ from sqlalchemy import select, desc
 from typing import List
 from pydantic import BaseModel
 
-from backend_python.db.models import User
-from backend_python.db.database import get_async_session
-from backend_python.api.auth_api import fastapi_users # 正しい認証機能をインポート
+from db.models import User
+from db.database import get_async_session
+from api.auth_api import fastapi_users # 正しい認証機能をインポート
 
 router = APIRouter()
 

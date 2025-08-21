@@ -1,7 +1,7 @@
 from fastapi_users import BaseUserManager
 from fastapi import Depends
-from ...db.models import User
-from ...db.auth.user_db import get_user_db
+from db.models import User
+from db.auth.user_db import get_user_db
 
 
 SECRET = "AAA123"

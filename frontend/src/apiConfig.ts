@@ -1,5 +1,5 @@
 // ngrokを再起動したら、この行のURLだけを書き換えます。
-const BASE_URL = 'https://99d055323a7f.ngrok-free.app'; 
+const BASE_URL = 'http://192.168.0.14:8000'; 
 
 export const API_CONFIG = {
   // Static endpoints
@@ -9,7 +9,7 @@ export const API_CONFIG = {
   logout: `${BASE_URL}/auth/jwt/logout`,
   getCurrentUser: `${BASE_URL}/auth/users/me`,
   getRanking: `${BASE_URL}/ranking`,
-  register: `${BASE_URL}/auth/register`, // ← この行を追加
+  register: `${BASE_URL}/auth/register`,
 
   // Dynamic endpoints requiring parameters (as functions)
   translate: (text: string) => `${BASE_URL}/translate/${text}`,

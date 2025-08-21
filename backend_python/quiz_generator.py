@@ -1,5 +1,5 @@
 import random
-from backend_python.jm_dict import load_kanji_entries
+from jm_dict import load_kanji_entries
 from fastapi import APIRouter, HTTPException
 
 router = APIRouter()
