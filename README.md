@@ -32,7 +32,14 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 ### 3. Database Setup
-1. Configure environment variables in .env
+KanjiGO requires a local PostgreSQL database. Follow these steps to create your own database and tables.
+1. Open your DB client.
+2. Connect to localhost with your PostgreSQL username.
+3. Right-click the server → Create → Database
+4. Name it kanji_db and save.
+5. Configure environment variables in .env
+6.
+```bash
 db_user=postgres
 db_password=your_password
 db_host=localhost
@@ -41,6 +48,14 @@ db_database=kanji_db
 
 kanji_alive_api_key=your_api_key
 kanji_alive_api_host=kanjialive-api.p.rapidapi.com
+```
 
-2. Create tables from models:
+7. Create tables from models:
 python -m backend_python.db.create_tables
+8. Verify the Database
+Check your tables in any DB client:
+
+```sql
+SELECT * FROM users;
+```
+If you see the empty tables, your database is ready.
